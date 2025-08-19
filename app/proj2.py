@@ -45,9 +45,14 @@ def fig_to_base64(fig, fmt="png", max_size=100_000):
     return base64.b64encode(data).decode("utf-8")
 
 
+
 @app.post("/api/")
 async def analyze_data(
+<<<<<<< HEAD
     questions: Optional[UploadFile] = File(None),
+=======
+    questions: UploadFile = File(...),
+>>>>>>> b4278bafc553911bb439240e15fb4836a77f3077
     files: Optional[List[UploadFile]] = File(None),
 ):
     questions_text = (await questions.read()).decode("utf-8")
@@ -169,3 +174,7 @@ async def analyze_data(
 
     return JSONResponse(content=response)
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> b4278bafc553911bb439240e15fb4836a77f3077
