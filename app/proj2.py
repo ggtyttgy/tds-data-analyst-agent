@@ -5,7 +5,7 @@ import pandas as pd
 import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
 from typing import List, Optional
 from dotenv import load_dotenv
@@ -14,16 +14,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = FastAPI()
+
 @app.get("/")
 async def root():
     return {"status": "ok", "message": "Service is live"}
-
 
 # Read the AI proxy token from environment
 AI_PROXY_TOKEN = os.getenv("AI_PROXY_TOKEN")
 if not AI_PROXY_TOKEN:
     raise RuntimeError("AI_PROXY_TOKEN environment variable is not set")
-
 
 # Utility function to encode matplotlib figure to base64 PNG under 100kB
 def fig_to_base64(fig, fmt="png", max_size=100_000):
@@ -35,7 +34,8 @@ def fig_to_base64(fig, fmt="png", max_size=100_000):
     if len(data) > max_size:
         scale = (max_size / len(data)) ** 0.5
         fig.set_size_inches(
-            fig.get_size_inches()[0] * scale, fig.get_size_inches()[1] * scale
+            fig.get_size_inches()[0] * scale,
+            fig.get_size_inches()[1] * scale
         )
         buf = io.BytesIO()
         fig.savefig(buf, format=fmt, bbox_inches="tight")
@@ -44,18 +44,14 @@ def fig_to_base64(fig, fmt="png", max_size=100_000):
     plt.close(fig)
     return base64.b64encode(data).decode("utf-8")
 
-
-
 @app.post("/api/")
 async def analyze_data(
-<<<<<<< HEAD
     questions: Optional[UploadFile] = File(None),
-=======
-    questions: UploadFile = File(...),
->>>>>>> b4278bafc553911bb439240e15fb4836a77f3077
     files: Optional[List[UploadFile]] = File(None),
 ):
-    questions_text = (await questions.read()).decode("utf-8")
+    questions_text = ""
+    if questions:
+        questions_text = (await questions.read()).decode("utf-8")
 
     # Build a dict of filename -> pandas DataFrame
     dfs = {}
@@ -87,17 +83,15 @@ async def analyze_data(
         df_sorted["sales"].cumsum().plot(ax=ax, color="red")
         cumulative_sales_chart = fig_to_base64(fig)
 
-        response.update(
-            {
-                "total_sales": total_sales,
-                "top_region": top_region,
-                "day_sales_correlation": day_sales_corr,
-                "bar_chart": bar_chart,
-                "median_sales": median_sales,
-                "total_sales_tax": total_sales_tax,
-                "cumulative_sales_chart": cumulative_sales_chart,
-            }
-        )
+        response.update({
+            "total_sales": total_sales,
+            "top_region": top_region,
+            "day_sales_correlation": day_sales_corr,
+            "bar_chart": bar_chart,
+            "median_sales": median_sales,
+            "total_sales_tax": total_sales_tax,
+            "cumulative_sales_chart": cumulative_sales_chart,
+        })
 
     elif "sample-weather.csv" in dfs:
         df = dfs["sample-weather.csv"]
@@ -117,17 +111,15 @@ async def analyze_data(
         df["precipitation"].plot(kind="hist", color="orange", ax=ax)
         precip_histogram = fig_to_base64(fig)
 
-        response.update(
-            {
-                "average_temp_c": average_temp_c,
-                "max_precip_date": str(max_precip_date),
-                "min_temp_c": min_temp_c,
-                "temp_precip_correlation": temp_precip_corr,
-                "average_precip_mm": average_precip_mm,
-                "temp_line_chart": temp_line_chart,
-                "precip_histogram": precip_histogram,
-            }
-        )
+        response.update({
+            "average_temp_c": average_temp_c,
+            "max_precip_date": str(max_precip_date),
+            "min_temp_c": min_temp_c,
+            "temp_precip_correlation": temp_precip_corr,
+            "average_precip_mm": average_precip_mm,
+            "temp_line_chart": temp_line_chart,
+            "precip_histogram": precip_histogram,
+        })
 
     elif "edges.csv" in dfs:
         df = dfs["edges.csv"]
@@ -152,29 +144,25 @@ async def analyze_data(
         ax.bar(range(len(degrees)), sorted(degrees), color="green")
         degree_histogram = fig_to_base64(fig)
 
-        response.update(
-            {
-                "edge_count": edge_count,
-                "highest_degree_node": highest_degree_node,
-                "average_degree": avg_degree,
-                "density": density,
-                "shortest_path_alice_eve": shortest_path,
-                "network_graph": network_graph,
-                "degree_histogram": degree_histogram,
-            }
-        )
+        response.update({
+            "edge_count": edge_count,
+            "highest_degree_node": highest_degree_node,
+            "average_degree": avg_degree,
+            "density": density,
+            "shortest_path_alice_eve": shortest_path,
+            "network_graph": network_graph,
+            "degree_histogram": degree_histogram,
+        })
 
     else:
         # fallback: just echo questions and files
         response = {
             "status": "success",
-            "received_questions": len(questions_text.splitlines()),
+            "received_questions": len(questions_text.splitlines()) if questions_text else 0,
             "received_files": [f.filename for f in files] if files else [],
         }
 
     return JSONResponse(content=response)
 
-<<<<<<< HEAD
-=======
 
->>>>>>> b4278bafc553911bb439240e15fb4836a77f3077
+
