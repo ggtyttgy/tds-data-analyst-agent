@@ -4,13 +4,12 @@ import base64
 import pandas as pd
 import networkx as nx
 import matplotlib.pyplot as plt
-import numpy as np
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 from typing import List, Optional
 from dotenv import load_dotenv
 
-# Load .env if running locally
+# Load .env for local development
 load_dotenv()
 
 app = FastAPI()
@@ -19,17 +18,18 @@ app = FastAPI()
 async def root():
     return {"status": "ok", "message": "Service is live"}
 
-# Read the AI proxy token from environment
+# Read AI proxy token (if needed for LLM calls later)
 AI_PROXY_TOKEN = os.getenv("AI_PROXY_TOKEN")
-if not AI_PROXY_TOKEN:
-    raise RuntimeError("AI_PROXY_TOKEN environment variable is not set")
 
-# Utility function to encode matplotlib figure to base64 PNG under 100kB
-def fig_to_base64(fig, fmt="png", max_size=100_000):
+
+# ---------- Utility ----------
+def fig_to_base64(fig, fmt="png", max_size=100_000) -> str:
+    """Convert matplotlib figure to base64 string under 100kB."""
     buf = io.BytesIO()
     fig.savefig(buf, format=fmt, bbox_inches="tight")
     buf.seek(0)
     data = buf.read()
+
     # Resize if too large
     if len(data) > max_size:
         scale = (max_size / len(data)) ** 0.5
@@ -41,34 +41,40 @@ def fig_to_base64(fig, fmt="png", max_size=100_000):
         fig.savefig(buf, format=fmt, bbox_inches="tight")
         buf.seek(0)
         data = buf.read()
+
     plt.close(fig)
     return base64.b64encode(data).decode("utf-8")
 
+
+# ---------- Main API ----------
 @app.post("/api/")
 async def analyze_data(
     questions: Optional[UploadFile] = File(None),
     files: Optional[List[UploadFile]] = File(None),
 ):
+    # Safely read questions
     questions_text = ""
     if questions:
         questions_text = (await questions.read()).decode("utf-8")
 
-    # Build a dict of filename -> pandas DataFrame
+    # Build a dict of {lower_filename: DataFrame}
     dfs = {}
     if files:
         for f in files:
             content = await f.read()
-            if f.filename.endswith(".csv"):
-                dfs[f.filename] = pd.read_csv(io.BytesIO(content))
+            if f.filename.lower().endswith(".csv"):
+                dfs[f.filename.lower()] = pd.read_csv(io.BytesIO(content))
 
     response = {}
 
-    # Example handling for known CSV names
+    # ---------- Sample Sales ----------
     if "sample-sales.csv" in dfs:
         df = dfs["sample-sales.csv"]
         total_sales = df["sales"].sum()
         top_region = df.groupby("region")["sales"].sum().idxmax()
-        day_sales_corr = df["date"].apply(lambda x: pd.to_datetime(x).day).corr(df["sales"])
+        day_sales_corr = (
+            df["date"].apply(lambda x: pd.to_datetime(x).day).corr(df["sales"])
+        )
         median_sales = df["sales"].median()
         total_sales_tax = total_sales * 0.1
 
@@ -93,6 +99,7 @@ async def analyze_data(
             "cumulative_sales_chart": cumulative_sales_chart,
         })
 
+    # ---------- Sample Weather ----------
     elif "sample-weather.csv" in dfs:
         df = dfs["sample-weather.csv"]
         average_temp_c = df["temperature"].mean()
@@ -121,6 +128,7 @@ async def analyze_data(
             "precip_histogram": precip_histogram,
         })
 
+    # ---------- Graph / Edges ----------
     elif "edges.csv" in dfs:
         df = dfs["edges.csv"]
         G = nx.from_pandas_edgelist(df, source="source", target="target")
@@ -139,7 +147,7 @@ async def analyze_data(
         network_graph = fig_to_base64(fig)
 
         # Degree histogram
-        degrees = [d for n, d in G.degree()]
+        degrees = [d for _, d in G.degree()]
         fig, ax = plt.subplots()
         ax.bar(range(len(degrees)), sorted(degrees), color="green")
         degree_histogram = fig_to_base64(fig)
@@ -154,8 +162,8 @@ async def analyze_data(
             "degree_histogram": degree_histogram,
         })
 
+    # ---------- Fallback ----------
     else:
-        # fallback: just echo questions and files
         response = {
             "status": "success",
             "received_questions": len(questions_text.splitlines()) if questions_text else 0,
