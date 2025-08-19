@@ -14,6 +14,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = FastAPI()
+@app.get("/")
+async def root():
+    return {"status": "ok", "message": "Service is live"}
+
 
 # Read the AI proxy token from environment
 AI_PROXY_TOKEN = os.getenv("AI_PROXY_TOKEN")
@@ -164,3 +168,5 @@ async def analyze_data(
         }
 
     return JSONResponse(content=response)
+
+
